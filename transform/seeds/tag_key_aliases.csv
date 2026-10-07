@@ -1,0 +1,8 @@
+raw_key,canonical_key,priority,note
+business_unit,business_unit,1,standard key
+org,business_unit,2,legacy key used by some accounts
+costcenter,business_unit,3,finance-owned key on Azure resources
+application,application,1,standard key
+project,application,2,legacy key
+environment,environment,1,standard key
+env,environment,2,short form

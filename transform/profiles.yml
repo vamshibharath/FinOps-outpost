@@ -1,0 +1,19 @@
+# dev  -> DuckDB file (runs on a laptop, zero cloud spend)
+# prod -> Snowflake (same models; credentials from env vars, never committed)
+finops_attribution:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: data/warehouse/finops.duckdb
+      threads: 4
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', '') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', '') }}"
+      authenticator: externalbrowser
+      role: FINOPS_TRANSFORMER
+      warehouse: FINOPS_XS_WH
+      database: FINOPS
+      schema: ANALYTICS
+      threads: 8

@@ -1,0 +1,37 @@
+name: finops_attribution
+version: "1.0.0"
+config-version: 2
+profile: finops_attribution
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Where ingestion lands Parquet (S3 path in prod, local path in dev).
+  lake_path: "data/lake/raw_focus/**/*.parquet"
+  # Planning assumption for commitment savings estimates (blended SP/CUD discount).
+  assumed_commitment_discount: 0.28
+  # Percentile of hourly on-demand compute spend used as the "safe to commit" baseline.
+  commitment_baseline_percentile: 0.10
+  # Reconciliation tolerance in billing currency.
+  reconciliation_tolerance: 0.0001
+
+models:
+  finops_attribution:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: table
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  finops_attribution:
+    +schema: reference

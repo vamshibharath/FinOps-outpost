@@ -1,0 +1,7 @@
+service_category,allocation_method,rationale
+Compute,usage_driver,untagged compute follows each team's tagged compute hours
+Networking,usage_driver,data transfer scales with running workloads
+Storage,proportional_cost,storage follows each team's share of tagged storage spend
+Databases,proportional_cost,databases follow tagged database spend
+Management and Governance,proportional_cost,platform overhead shared by overall footprint
+Other,proportional_cost,catch-all shared overhead

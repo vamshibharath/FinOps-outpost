@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Contract unit tests
+        run: pytest -q tests/test_contract.py
+      - name: Download sample billing data
+        run: make data
+      - name: Ingest -> dbt build (models + data tests) -> reconcile -> report
+        run: make pipeline
+      - name: Integration + API tests
+        run: pytest -q
+      - name: Schema-drift regression (must be blocked)
+        run: make drift-demo | tee drift.log && grep -q "pipeline halted" drift.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: finops-report
+          path: report/finops_report.html
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate

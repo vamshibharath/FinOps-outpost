@@ -1,0 +1,45 @@
+# Data contract for inbound FOCUS 1.0 billing exports.
+# The gate in ingestion/validate_contract.py enforces this BEFORE anything lands in the lake.
+# Breaking changes (missing/renamed column, type drift) halt the load and quarantine the file.
+contract: focus_billing
+version: "1.0"
+
+required_columns:
+  # column: expected logical type
+  BilledCost: numeric
+  EffectiveCost: numeric
+  ListCost: numeric
+  ContractedCost: numeric
+  BillingCurrency: string
+  BillingPeriodStart: timestamp
+  BillingPeriodEnd: timestamp
+  ChargePeriodStart: timestamp
+  ChargePeriodEnd: timestamp
+  ChargeCategory: string
+  ChargeFrequency: string
+  ProviderName: string
+  ServiceCategory: string
+  ServiceName: string
+  SubAccountId: string
+  SubAccountName: string
+  ResourceId: string
+  RegionId: string
+  PricingCategory: string
+  CommitmentDiscountType: string
+  CommitmentDiscountStatus: string
+  CommitmentDiscountId: string
+  ConsumedQuantity: numeric
+  Tags: json
+
+# Values are compared case-insensitively after trimming; unknowns are warnings, not failures.
+allowed_values:
+  ChargeCategory: [usage, purchase, tax, credit, adjustment]
+  BillingCurrency: [usd]
+
+# Hard quality thresholds evaluated on every batch.
+thresholds:
+  max_null_pct:
+    EffectiveCost: 0.0
+    ProviderName: 0.0
+    BillingPeriodStart: 0.0
+  min_rows: 1

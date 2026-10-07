@@ -1,0 +1,16 @@
+data/landing/*
+data/lake/*
+data/quarantine/*
+data/warehouse/*
+!data/**/.gitkeep
+transform/target/
+transform/dbt_packages/
+transform/logs/
+logs/
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+.terraform/
+*.tfstate*
+report/finops_report.html

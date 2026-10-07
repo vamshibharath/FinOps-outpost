@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: stg_focus__charges
+    description: Normalized FOCUS line items across AWS, Azure, OCI and GCP.
+    columns:
+      - name: charge_id
+        tests: [unique, not_null]
+      - name: provider
+        tests: [not_null]
+      - name: effective_cost
+        tests: [not_null]
+      - name: charge_category
+        tests:
+          - accepted_values:
+              arguments:
+                values: [Usage, Purchase, Tax, Credit, Adjustment]
+
+  - name: int_charge_tags
+    description: Canonical business_unit / application / environment per charge, resolved via tag_key_aliases.
+    columns:
+      - name: charge_id
+        tests: [unique]
+
+  - name: fct_cost_allocated
+    description: >
+      Attribution fact. Each source dollar lands on one business unit via direct tags or a
+      governed shared-cost rule; leftovers go to an explicit UNALLOCATED bucket.
+    columns:
+      - name: business_unit
+        tests: [not_null]
+      - name: allocation_method
+        tests:
+          - accepted_values:
+              arguments:
+                values: [direct, shared_usage_driver, shared_category_cost, shared_provider_cost, unallocated]
+
+  - name: mart_chargeback_monthly
+    description: Monthly chargeback per business unit and provider (direct vs shared).
+  - name: mart_tag_coverage
+    description: Tag coverage by sub-account, ranked by untagged spend.
+  - name: mart_commitment_coverage
+    description: Commitment coverage, unused commitment (waste) and savings vs list.
+  - name: mart_commitment_recommendation
+    description: Baseline hourly commitment sizing and estimated savings.
+  - name: mart_application_cost
+    description: Direct cost per application with prod / non-prod split.
