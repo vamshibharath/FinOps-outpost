@@ -132,7 +132,7 @@ th{{color:var(--muted);font-weight:600}}td.n,th.n{{text-align:right;font-variant
 .scroll{{overflow-x:auto}}
 </style></head><body><main>
 <h1>Cloud Cost Attribution Report</h1>
-<p class="sub">Multi-cloud FOCUS billing · generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} ·
+<p class="sub">Multi-cloud FOCUS billing · report run {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} ·
 reconciliation <span class="{'ok' if recon_ok else 'bad'}">{'PASSED' if recon_ok else 'FAILED'}</span></p>
 
 <div class="grid">
@@ -155,7 +155,7 @@ reconciliation <span class="{'ok' if recon_ok else 'bad'}">{'PASSED' if recon_ok
 </table></div></div>
 
 <div class="card"><h2>Shared-cost drivers</h2><p class="note">Untagged spend is split by a governed rule per
-category. Compute and networking use service telemetry pulled from an observability API (simulated, see README).</p>
+category. Compute and networking use the usage telemetry supplied for this demonstration. Production deployment connects this step to the client's observability endpoint.</p>
 <div class="scroll"><table><tr><th>Driver</th><th class="n">Teams receiving a share</th><th class="n">Cost allocated</th></tr>
 {rows(drivers, [lambda r: driver_label.get(r['allocation_method'], r['allocation_method']),
                 lambda r: f"{r['teams']:,}", lambda r: money(r['cost'])])}
