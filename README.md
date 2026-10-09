@@ -4,6 +4,9 @@ An end-to-end pipeline that turns raw multi-cloud billing data into **trusted ch
 tag-coverage and commitment numbers**. It handles late and restated bills, splits shared cost
 using service telemetry, and refuses to publish anything that doesn't tie back to the source.
 
+**New here? Start with [WALKTHROUGH.md](WALKTHROUGH.md)**, a 20-minute self-guided tour with the commands to
+run and what you should see at each step.
+
 Built on the FinOps Foundation's **FOCUS 1.0 sample dataset**: 100,000 anonymized real billing
 line items from AWS, Azure, Oracle Cloud and a small Google Cloud slice.
 

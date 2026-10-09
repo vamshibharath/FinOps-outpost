@@ -1,0 +1,101 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Cloud Cost Attribution</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1d1d1b;--muted:#6b6b66;--line:#e4e3de;--accent:#2f5d8a;--good:#2e7d4f;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#151515;--card:#1f1f1e;--ink:#ececea;--muted:#a3a39d;--line:#33332f;--accent:#7fa8d1;--good:#6cc08f;--bad:#f08a80}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Inter,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:32px 16px}h1{margin:0 0 4px;font-size:26px}h2{font-size:17px;margin:0 0 12px}
+.sub{color:var(--muted);margin:0 0 24px}.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+.kpi .v{font-size:26px;font-weight:650}.kpi .l{color:var(--muted);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:var(--good);font-weight:600}.bad{color:var(--bad);font-weight:600}.note{color:var(--muted);font-size:13px}
+.two{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}canvas{max-height:300px}
+.scroll{overflow-x:auto}
+</style></head><body><main>
+<h1>Cloud Cost Attribution Report</h1>
+<p class="sub">Multi-cloud FOCUS billing · generated 2026-10-09 03:21 UTC ·
+reconciliation <span class="ok">PASSED</span></p>
+
+<div class="grid">
+ <div class="card kpi"><div class="l">Effective (amortized) cost</div><div class="v">$956.40</div></div>
+ <div class="card kpi"><div class="l">Billed (invoice) cost</div><div class="v">$1,465.78</div></div>
+ <div class="card kpi"><div class="l">Usage spend tagged directly</div><div class="v">96.4%</div></div>
+ <div class="card kpi"><div class="l">Line items · providers</div><div class="v">100,025 · 4</div></div>
+</div>
+
+<div class="two">
+ <div class="card"><h2>How every dollar was attributed</h2><canvas id="m"></canvas>
+ <p class="note">Negative shared amounts are credits, distributed in proportion to each team's spend.</p></div>
+ <div class="card"><h2>Tag coverage by provider (usage spend)</h2><canvas id="c"></canvas></div>
+</div>
+
+<div class="card"><h2>Top business units — chargeback</h2><div class="scroll"><table>
+<tr><th>Business unit</th><th class="n">Direct</th><th class="n">Shared allocation</th><th class="n">Total chargeback</th></tr>
+<tr><td>SubACM</td><td class='n'>$298.22</td><td class='n'>$0.00</td><td class='n'><b>$298.22</b></td></tr><tr><td>trey</td><td class='n'>$261.36</td><td class='n'>$17.64</td><td class='n'><b>$278.99</b></td></tr><tr><td>PeoriaData</td><td class='n'>$1,296.70</td><td class='n'>−$1,044.03</td><td class='n'><b>$252.67</b></td></tr><tr><td>CharlotteIT</td><td class='n'>$1.00</td><td class='n'>$42.52</td><td class='n'><b>$43.52</b></td></tr><tr><td>PretoriaSRE</td><td class='n'>$21.00</td><td class='n'>−$7.91</td><td class='n'><b>$13.09</b></td></tr><tr><td>1234</td><td class='n'>$10.07</td><td class='n'>$0.00</td><td class='n'><b>$10.07</b></td></tr><tr><td>ZurichIT</td><td class='n'>$10.00</td><td class='n'>$0.00</td><td class='n'><b>$10.00</b></td></tr><tr><td>ChandlerProcurement</td><td class='n'>$5.00</td><td class='n'>$0.00</td><td class='n'><b>$5.00</b></td></tr><tr><td>FlorenceFinance</td><td class='n'>$4.00</td><td class='n'>$0.01</td><td class='n'><b>$4.01</b></td></tr><tr><td>JambiProcurement</td><td class='n'>$4.00</td><td class='n'>$0.00</td><td class='n'><b>$4.00</b></td></tr>
+</table></div></div>
+
+<div class="card"><h2>Shared-cost drivers</h2><p class="note">Untagged spend is split by a governed rule per
+category. Compute and networking use service telemetry pulled from an observability API (simulated, see README).</p>
+<div class="scroll"><table><tr><th>Driver</th><th class="n">Teams receiving a share</th><th class="n">Cost allocated</th></tr>
+<tr><td>Share of spend in that service category</td><td class='n'>16</td><td class='n'>$54.07</td></tr><tr><td>Share of total provider spend (credits, tax)</td><td class='n'>43</td><td class='n'>−$1,189.20</td></tr><tr><td>CPU core-hours (telemetry API)</td><td class='n'>1,460</td><td class='n'>$19.33</td></tr><tr><td>Request volume (telemetry API)</td><td class='n'>1,460</td><td class='n'>$2.56</td></tr>
+</table></div></div>
+
+<div class="card"><h2>Where to fix tagging first</h2><p class="note">Sub-accounts ranked by untagged usage spend — the governance backlog.</p>
+<div class="scroll"><table><tr><th>Provider</th><th>Sub-account</th><th class="n">Untagged spend</th><th class="n">Coverage</th></tr>
+<tr><td>AWS</td><td>Odyssey Horizon</td><td class='n'>$43.32</td><td class='n'>6.5%</td></tr><tr><td>Microsoft</td><td>Nimbus Zenith</td><td class='n'>$10.66</td><td class='n'>0.0%</td></tr><tr><td>AWS</td><td>Orion Zenith</td><td class='n'>$6.00</td><td class='n'>93.4%</td></tr><tr><td>Microsoft</td><td>Horizon Eclipse</td><td class='n'>$3.22</td><td class='n'>98.9%</td></tr><tr><td>AWS</td><td>Voyager Eclipse</td><td class='n'>$3.00</td><td class='n'>0.0%</td></tr><tr><td>Microsoft</td><td>Apollo Orion</td><td class='n'>$2.42</td><td class='n'>0.0%</td></tr><tr><td>AWS</td><td>Orion Nimbus</td><td class='n'>$2.00</td><td class='n'>66.7%</td></tr><tr><td>AWS</td><td>Odyssey Odyssey</td><td class='n'>$2.00</td><td class='n'>81.8%</td></tr>
+</table></div></div>
+
+<div class="card"><h2>Commitments (Savings Plans / Reservations / CUDs)</h2><div class="scroll"><table>
+<tr><th>Provider</th><th class="n">Committed</th><th class="n">On-demand</th><th class="n">Unused (waste)</th><th class="n">Coverage</th></tr>
+<tr><td>AWS 2024-09</td><td class='n'>$9.00</td><td class='n'>$1,404.90</td><td class='n'>—</td><td class='n'>0.6%</td></tr><tr><td>Microsoft 2024-09</td><td class='n'>$20.07</td><td class='n'>$169.03</td><td class='n'>$0.00</td><td class='n'>10.6%</td></tr><tr><td>Oracle 2024-09</td><td class='n'>—</td><td class='n'>—</td><td class='n'>—</td><td class='n'>0.0%</td></tr><tr><td>Oracle 2024-10</td><td class='n'>—</td><td class='n'>—</td><td class='n'>—</td><td class='n'>0.0%</td></tr>
+</table></div>
+<h2 style="margin-top:18px">Recommended commitment (safe floor)</h2><div class="scroll"><table>
+<tr><th>Provider</th><th class="n">Daily commit</th><th class="n">Share of on-demand covered</th><th class="n">Est. savings / period</th></tr>
+<tr><td>AWS 2024-09</td><td class='n'>$6.70</td><td class='n'>13.4%</td><td class='n'>$52.53</td></tr><tr><td>Microsoft 2024-09</td><td class='n'>$5.03</td><td class='n'>36.8%</td><td class='n'>$26.75</td></tr>
+</table></div><p class="note">Floor = 10th percentile of daily on-demand compute; savings assume a
+28% blended discount (planning estimate, configurable in dbt vars).</p></div>
+
+<div class="card"><h2>Data completeness</h2><p class="note">Days with usage vs days in the billing month.
+A partial month is the most common reason a chargeback looks too low. Late-arriving lines = usage incurred in an earlier month but billed in this one.</p>
+<div class="scroll"><table><tr><th>Provider / month</th><th class="n">Days with usage</th><th class="n">Missing days</th>
+<th class="n">Complete</th><th class="n">Late-arriving lines</th></tr>
+<tr><td>AWS 2024-09</td><td class='n'>30 / 30</td><td class='n'>0</td><td class='n'>100.0%</td><td class='n'>0</td></tr><tr><td>Google_Cloud 2024-03</td><td class='n'>1 / 31</td><td class='n'><span class='bad'>30</span></td><td class='n'>3.2%</td><td class='n'>0</td></tr><tr><td>Microsoft 2024-09</td><td class='n'>19 / 30</td><td class='n'><span class='bad'>11</span></td><td class='n'>63.3%</td><td class='n'>0</td></tr><tr><td>Oracle 2024-09</td><td class='n'>15 / 30</td><td class='n'><span class='bad'>15</span></td><td class='n'>50.0%</td><td class='n'>0</td></tr><tr><td>Oracle 2024-10</td><td class='n'>0 / 31</td><td class='n'><span class='bad'>31</span></td><td class='n'>0.0%</td><td class='n'>37</td></tr>
+</table></div></div>
+
+<div class="card"><h2>Batch history and restatements</h2><p class="note">Providers re-send whole months. A newer batch
+replaces only the provider/month partitions it contains; duplicate line items are dropped on load.</p>
+<div class="scroll"><table><tr><th>Batch</th><th>Source file</th><th class="n">Rows</th><th class="n">Duplicates dropped</th><th>Replaced</th></tr>
+<tr><td>76e9158659d40cde</td><td>focus_sample_100000.csv.gz</td><td class='n'>100,000</td><td class='n'>0</td><td>—</td></tr><tr><td>d705afbe279354df</td><td>focus_aws_2024-09_restated.csv</td><td class='n'>94,376</td><td class='n'>10</td><td>AWS/2024-09 (was batch 76e9158659d40cde)</td></tr>
+</table></div></div>
+
+<div class="card"><h2>Measured storage and scan savings</h2>
+<p class="note">Same question ("AWS 2024-09 effective cost by service") against three layouts. Bytes scanned is what Athena bills
+($5/TB); read from Parquet footer metadata, not estimated. All layouts return identical results:
+yes.</p>
+<div class="scroll"><table><tr><th>Layout</th><th class="n">Bytes scanned</th><th class="n">Reduction</th><th class="n">Median latency</th></tr>
+<tr><td>gzip CSV, as delivered (full scan)</td><td class='n'>9.17 MB</td><td class='n'>0.0%</td><td class='n'>376.1 ms</td></tr><tr><td>Parquet, only needed columns</td><td class='n'>0.09 MB</td><td class='n'>99.0%</td><td class='n'>3.3 ms</td></tr><tr><td>Parquet, needed columns + AWS/2024-09 partition only</td><td class='n'>0.07 MB</td><td class='n'>99.3%</td><td class='n'>2.6 ms</td></tr></table></div>
+<p class="note">Storage: raw CSV 75.3 MB · gzip CSV 9.2 MB ·
+Parquet lake 6.6 MB. The sample is small, so the ratios are the result, not the dollars.</p></div>
+
+<div class="card"><h2>Reconciliation audit (latest run)</h2>
+<p class="note">10 of 10 per-provider/month checks passed.</p><div class="scroll"><table>
+<tr><th>Check</th><th class="n">Expected</th><th class="n">Actual</th><th class="n">Diff</th><th class="n">Status</th></tr>
+<tr><td>rows_source_vs_staging</td><td class='n'>100,025.000000</td><td class='n'>100,025.000000</td><td class='n'>0.00000000</td><td class='n'><span class='ok'>PASS</span></td></tr><tr><td>billed_source_vs_staging</td><td class='n'>1,465.780778</td><td class='n'>1,465.780779</td><td class='n'>0.00000077</td><td class='n'><span class='ok'>PASS</span></td></tr><tr><td>effective_source_vs_staging</td><td class='n'>956.399955</td><td class='n'>956.399955</td><td class='n'>0.00000046</td><td class='n'><span class='ok'>PASS</span></td></tr><tr><td>billed_staging_vs_allocated</td><td class='n'>1,465.780779</td><td class='n'>1,465.780779</td><td class='n'>0.00000000</td><td class='n'><span class='ok'>PASS</span></td></tr><tr><td>effective_staging_vs_allocated</td><td class='n'>956.399955</td><td class='n'>956.399955</td><td class='n'>0.00000000</td><td class='n'><span class='ok'>PASS</span></td></tr>
+</table></div></div>
+
+<p class="note">Data: FinOps Foundation FOCUS 1.0 sample (anonymized real billing; amounts are scaled).</p>
+</main>
+<script>
+const css = getComputedStyle(document.documentElement);
+const ink = css.getPropertyValue('--muted').trim(), accent = css.getPropertyValue('--accent').trim();
+Chart.defaults.color = ink; Chart.defaults.borderColor = css.getPropertyValue('--line').trim();
+new Chart(document.getElementById('m'), {type:'bar', data:{labels:["direct", "shared_category_cost", "shared_telemetry_cpu", "shared_telemetry_requests", "unallocated", "shared_provider_cost"],
+  datasets:[{data:[2069.64, 54.07, 19.33, 2.56, 0.0, -1189.2], backgroundColor:accent}]},
+  options:{indexAxis:'y', plugins:{legend:{display:false}}}});
+new Chart(document.getElementById('c'), {type:'bar', data:{labels:["AWS", "Microsoft", "Oracle"],
+  datasets:[{data:[96.2, 97.0, 100.0], backgroundColor:accent}]},
+  options:{plugins:{legend:{display:false}}, scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}}}}});
+</script></body></html>
