@@ -13,9 +13,11 @@ clean-targets: ["target", "dbt_packages"]
 vars:
   # Where ingestion lands Parquet (S3 path in prod, local path in dev).
   lake_path: "data/lake/raw_focus/**/*.parquet"
+  # Daily service telemetry landed by ingestion/telemetry/fetch_telemetry.py.
+  telemetry_path: "data/lake/telemetry/**/*.parquet"
   # Planning assumption for commitment savings estimates (blended SP/CUD discount).
   assumed_commitment_discount: 0.28
-  # Percentile of hourly on-demand compute spend used as the "safe to commit" baseline.
+  # Percentile of daily on-demand compute spend used as the "safe to commit" baseline.
   commitment_baseline_percentile: 0.10
   # Reconciliation tolerance in billing currency.
   reconciliation_tolerance: 0.0001

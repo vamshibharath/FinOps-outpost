@@ -6,12 +6,17 @@ from __future__ import annotations
 
 import html
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from ingestion.load_raw import read_manifest  # noqa: E402
+
 WAREHOUSE = Path("data/warehouse/finops.duckdb")
+BENCH = Path("data/warehouse/benchmark.json")
 OUT = Path("report/finops_report.html")
 
 
@@ -24,6 +29,8 @@ def q(con, sql):
 def money(v):
     if v is None:
         return "—"
+    if abs(v) < 0.005:  # avoid "-$0.00" from rounding
+        return "$0.00"
     return f"−${abs(v):,.2f}" if v < 0 else f"${v:,.2f}"
 
 
@@ -56,15 +63,55 @@ def main() -> None:
     rec = q(con, "SELECT * FROM marts.mart_commitment_recommendation ORDER BY provider")
     recon = q(con, """SELECT check_name, expected, actual, diff, passed FROM audit.reconciliation_runs
                       WHERE run_id = (SELECT run_id FROM audit.reconciliation_runs ORDER BY run_at DESC LIMIT 1)""")
+    completeness = q(con, "SELECT * FROM marts.mart_data_completeness ORDER BY provider, billing_period")
+    drivers = q(con, """
+        SELECT allocation_method, count(DISTINCT business_unit) AS teams,
+               round(sum(allocated_effective_cost), 2) AS cost
+        FROM marts.fct_cost_allocated WHERE allocation_method LIKE 'shared_%'
+        GROUP BY 1 ORDER BY 1""")
     con.close()
+    batches = read_manifest()
+    bench = json.loads(BENCH.read_text()) if BENCH.exists() else None
 
     usage_total = sum(r["cost"] for r in usage_cov)
     tagged_total = sum(r["cost"] * (r["coverage"] or 0) for r in usage_cov)
     recon_ok = all(r["passed"] for r in recon)
+    recon_overall = [r for r in recon if "[" not in r["check_name"]]
+    recon_periods = [r for r in recon if "[" in r["check_name"]]
+    recon_periods_ok = sum(1 for r in recon_periods if r["passed"])
+    driver_label = {
+        "shared_telemetry_cpu": "CPU core-hours (telemetry API)",
+        "shared_telemetry_requests": "Request volume (telemetry API)",
+        "shared_usage_driver": "Compute hours on the bill",
+        "shared_category_cost": "Share of spend in that service category",
+        "shared_provider_cost": "Share of total provider spend (credits, tax)",
+    }
 
-    def rows(items, cols, num_from=1):
+    if bench:
+        sc = bench["scenarios"]
+        names = {"gzip_csv_full_scan": "gzip CSV, as delivered (full scan)",
+                 "parquet_column_pruning": "Parquet, only needed columns",
+                 "parquet_column_and_partition_pruning": "Parquet, needed columns + AWS/2024-09 partition only"}
+        brows = "".join(
+            f"<tr><td>{names[k]}</td><td class='n'>{v['bytes_scanned']/1e6:,.2f} MB</td>"
+            f"<td class='n'>{v['scan_reduction_vs_csv']:.1%}</td><td class='n'>{v['seconds']*1000:,.1f} ms</td></tr>"
+            for k, v in sc.items())
+        st = bench["storage"]
+        bench_section = f"""<div class="card"><h2>Measured storage and scan savings</h2>
+<p class="note">Same question ("{html.escape(bench['query'])}") against three layouts. Bytes scanned is what Athena bills
+(${bench['athena_usd_per_tb']:.0f}/TB); read from Parquet footer metadata, not estimated. All layouts return identical results:
+{'yes' if bench['results_match'] else '<span class=bad>NO</span>'}.</p>
+<div class="scroll"><table><tr><th>Layout</th><th class="n">Bytes scanned</th><th class="n">Reduction</th><th class="n">Median latency</th></tr>
+{brows}</table></div>
+<p class="note">Storage: raw CSV {st['csv_uncompressed_bytes']/1e6:,.1f} MB · gzip CSV {st['csv_gzip_bytes']/1e6:,.1f} MB ·
+Parquet lake {st['parquet_lake_bytes']/1e6:,.1f} MB. The sample is small, so the ratios are the result, not the dollars.</p></div>"""
+    else:
+        bench_section = ""
+
+    def rows(items, cols, num_from=1, num_to=None):
         def cell(i, c, r):
-            return f"<td class='n'>{c(r)}</td>" if i >= num_from else f"<td>{c(r)}</td>"
+            numeric = i >= num_from and (num_to is None or i < num_to)
+            return f"<td class='n'>{c(r)}</td>" if numeric else f"<td>{c(r)}</td>"
         return "".join("<tr>" + "".join(cell(i, c, r) for i, c in enumerate(cols)) + "</tr>" for r in items)
 
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -107,6 +154,13 @@ reconciliation <span class="{'ok' if recon_ok else 'bad'}">{'PASSED' if recon_ok
                    lambda r: money(r['shared']), lambda r: f"<b>{money(r['total'])}</b>"])}
 </table></div></div>
 
+<div class="card"><h2>Shared-cost drivers</h2><p class="note">Untagged spend is split by a governed rule per
+category. Compute and networking use service telemetry pulled from an observability API (simulated, see README).</p>
+<div class="scroll"><table><tr><th>Driver</th><th class="n">Teams receiving a share</th><th class="n">Cost allocated</th></tr>
+{rows(drivers, [lambda r: driver_label.get(r['allocation_method'], r['allocation_method']),
+                lambda r: f"{r['teams']:,}", lambda r: money(r['cost'])])}
+</table></div></div>
+
 <div class="card"><h2>Where to fix tagging first</h2><p class="note">Sub-accounts ranked by untagged usage spend — the governance backlog.</p>
 <div class="scroll"><table><tr><th>Provider</th><th>Sub-account</th><th class="n">Untagged spend</th><th class="n">Coverage</th></tr>
 {rows(top_untagged, [lambda r: r['provider'], lambda r: html.escape(str(r['sub_account_name'])),
@@ -126,9 +180,29 @@ reconciliation <span class="{'ok' if recon_ok else 'bad'}">{'PASSED' if recon_ok
 </table></div><p class="note">Floor = 10th percentile of daily on-demand compute; savings assume a
 {rec[0]['assumed_discount_rate'] if rec else 0.28:.0%} blended discount (planning estimate, configurable in dbt vars).</p></div>
 
-<div class="card"><h2>Reconciliation audit (latest run)</h2><div class="scroll"><table>
+<div class="card"><h2>Data completeness</h2><p class="note">Days with usage vs days in the billing month.
+A partial month is the most common reason a chargeback looks too low. Late-arriving lines = usage incurred in an earlier month but billed in this one.</p>
+<div class="scroll"><table><tr><th>Provider / month</th><th class="n">Days with usage</th><th class="n">Missing days</th>
+<th class="n">Complete</th><th class="n">Late-arriving lines</th></tr>
+{rows(completeness, [lambda r: f"{r['provider']} {r['billing_period']}", lambda r: f"{r['days_with_usage']} / {r['days_in_period']}",
+                     lambda r: (f"<span class='bad'>{r['missing_days']}</span>" if r['missing_days'] else "0"),
+                     lambda r: pct(r['completeness_pct']), lambda r: f"{r['late_arriving_lines']:,}"])}
+</table></div></div>
+
+<div class="card"><h2>Batch history and restatements</h2><p class="note">Providers re-send whole months. A newer batch
+replaces only the provider/month partitions it contains; duplicate line items are dropped on load.</p>
+<div class="scroll"><table><tr><th>Batch</th><th>Source file</th><th class="n">Rows</th><th class="n">Duplicates dropped</th><th>Replaced</th></tr>
+{rows(batches, [lambda r: r['batch_id'], lambda r: html.escape(r['source_file']), lambda r: f"{r['rows']:,}",
+                lambda r: f"{r.get('duplicates_dropped', 0):,}",
+                lambda r: html.escape(', '.join(r.get('replaced_partitions', [])) or '—')], num_from=2, num_to=4)}
+</table></div></div>
+
+{bench_section}
+
+<div class="card"><h2>Reconciliation audit (latest run)</h2>
+<p class="note">{recon_periods_ok} of {len(recon_periods)} per-provider/month checks passed.</p><div class="scroll"><table>
 <tr><th>Check</th><th class="n">Expected</th><th class="n">Actual</th><th class="n">Diff</th><th class="n">Status</th></tr>
-{rows(recon, [lambda r: r['check_name'], lambda r: f"{r['expected']:,.6f}", lambda r: f"{r['actual']:,.6f}",
+{rows(recon_overall, [lambda r: r['check_name'], lambda r: f"{r['expected']:,.6f}", lambda r: f"{r['actual']:,.6f}",
               lambda r: f"{r['diff']:.8f}", lambda r: "<span class='ok'>PASS</span>" if r['passed'] else "<span class='bad'>FAIL</span>"])}
 </table></div></div>
 

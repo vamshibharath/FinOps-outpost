@@ -15,20 +15,39 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Contract unit tests
-        run: pytest -q tests/test_contract.py
+      - name: Unit tests (contract gate, REST client, restatement, Dagster wiring)
+        run: pytest -q tests/test_contract.py tests/test_telemetry_client.py tests/test_restatement.py tests/test_dagster_defs.py
       - name: Download sample billing data
         run: make data
-      - name: Ingest -> dbt build (models + data tests) -> reconcile -> report
+      - name: Ingest -> telemetry -> dbt build -> reconcile -> benchmark -> report
         run: make pipeline
+      - name: Restatement regression (AWS re-sends September; must still reconcile)
+        run: make restatement-demo
       - name: Integration + API tests
         run: pytest -q
       - name: Schema-drift regression (must be blocked)
         run: make drift-demo | tee drift.log && grep -q "pipeline halted" drift.log
+      - name: Dagster definitions load
+        run: dagster definitions validate -f orchestration/dagster/definitions.py
       - uses: actions/upload-artifact@v4
         with:
           name: finops-report
           path: report/finops_report.html
+
+  scala:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ingestion/spark-scala
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Compile + ScalaTest (local Spark)
+        run: mvn -B test
 
   terraform:
     runs-on: ubuntu-latest

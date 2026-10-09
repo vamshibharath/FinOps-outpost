@@ -1,7 +1,8 @@
 service_category,allocation_method,rationale
-Compute,usage_driver,untagged compute follows each team's tagged compute hours
-Networking,usage_driver,data transfer scales with running workloads
-Storage,proportional_cost,storage follows each team's share of tagged storage spend
-Databases,proportional_cost,databases follow tagged database spend
-Management and Governance,proportional_cost,platform overhead shared by overall footprint
-Other,proportional_cost,catch-all shared overhead
+Compute,telemetry_cpu,untagged compute follows each team's CPU core-hours from observability telemetry
+Networking,telemetry_requests,data transfer and load balancers scale with each team's request volume
+Storage,category_cost,storage follows each team's share of tagged storage spend
+Databases,category_cost,databases follow tagged database spend
+Management and Governance,category_cost,platform overhead shared by each team's footprint in that category
+Other,category_cost,catch-all shared overhead
+"Credits, Tax & Adjustments",provider_cost,credits and tax follow each team's share of total spend (not usage)

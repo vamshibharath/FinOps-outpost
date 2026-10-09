@@ -1,6 +1,10 @@
 """Daily FinOps attribution pipeline.
 
-contract_gate -> land_raw -> dbt_build (models + tests) -> reconcile -> publish
+contract_gate -> land_raw -> fetch_telemetry (REST API: pagination, retries)
+                         -> dbt_build (models + tests) -> reconcile -> publish
+
+land_raw is restatement-safe (a re-sent month replaces its partition) and dbt's fact table
+is incremental by provider/month, so a late restatement reprocesses only that month.
 Any failure stops downstream publishing and raises a Datadog event, so Finance never
 sees numbers that didn't tie out.
 """
@@ -77,6 +81,14 @@ with DAG(
         bash_command=f"cd {PROJECT} && python ingestion/load_raw.py {LANDING_FILE}",
     )
 
+    fetch_telemetry = BashOperator(
+        task_id="fetch_telemetry",
+        # Pull the month-to-date window plus the previous month: telemetry can be late too.
+        bash_command=f"cd {PROJECT} && python ingestion/telemetry/fetch_telemetry.py "
+                     "--start {{ macros.ds_format(macros.ds_add(ds, -35), '%Y-%m-%d', '%Y-%m-01') }} --end {{ ds }}",
+        retries=3,
+    )
+
     dbt_build = BashOperator(
         task_id="dbt_build",
         bash_command=f"cd {PROJECT} && dbt build --project-dir transform --profiles-dir transform "
@@ -93,4 +105,6 @@ with DAG(
         bash_command=f"cd {PROJECT} && python report/build_report.py",
     )
 
-    contract_gate >> land_raw >> dbt_build >> reconcile >> publish_report
+    # The local mock API reads services from the billing lake, so telemetry follows land_raw.
+    # Against a real observability API, fetch_telemetry can run in parallel with land_raw.
+    contract_gate >> land_raw >> fetch_telemetry >> dbt_build >> reconcile >> publish_report

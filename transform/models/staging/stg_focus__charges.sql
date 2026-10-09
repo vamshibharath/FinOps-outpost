@@ -54,8 +54,12 @@ cleaned as (
         case when Tags is null or trim(Tags) in ('', '{}') then null
              else Tags end                                               as tags_json,
         _batch_id                                                        as batch_id,
-        _source_file                                                     as source_file
+        _source_file                                                     as source_file,
+        _loaded_at                                                       as loaded_at
     from src
 )
 
+-- Defense in depth: ingestion already replaces restated months and drops duplicates,
+-- but if two versions of a line item ever co-exist, keep only the most recently loaded.
 select * from cleaned
+qualify row_number() over (partition by charge_id order by loaded_at desc, charge_period_end desc) = 1

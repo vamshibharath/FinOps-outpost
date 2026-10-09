@@ -14,3 +14,7 @@ __pycache__/
 .terraform/
 *.tfstate*
 report/finops_report.html
+ingestion/spark-scala/target/
+spark-warehouse/
+metastore_db/
+.dagster/

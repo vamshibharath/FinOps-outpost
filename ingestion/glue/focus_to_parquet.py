@@ -52,15 +52,23 @@ typed = raw
 for c in REQUIRED_NUMERIC:
     typed = typed.withColumn(c, F.col(c).cast("double"))
 
+# Same line item delivered twice -> keep the latest version (matches the Scala and local loaders).
+from pyspark.sql.window import Window  # noqa: E402
+
+latest_first = Window.partitionBy("ProviderName", "Id").orderBy(F.col("ChargePeriodEnd").desc_nulls_last())
+typed = typed.withColumn("_rn", F.row_number().over(latest_first)).filter("_rn = 1").drop("_rn")
+
 out = (typed
        .withColumn("billing_period", F.date_format(F.to_timestamp("BillingPeriodStart"), "yyyy-MM"))
        .withColumn("provider", F.regexp_replace(F.trim("ProviderName"), r"\s+", "_"))
        .withColumn("_batch_id", F.lit(args["batch_id"]))
        .withColumn("_loaded_at", F.current_timestamp()))
 
-# Dynamic partition overwrite = idempotent re-runs per provider/period.
+# Dynamic partition overwrite = idempotent re-runs, and a restated month replaces only itself.
+# One task per partition + maxRecordsPerFile: no swarm of tiny files, no single giant file.
 (out.repartition("provider", "billing_period")
     .write.mode("overwrite").partitionBy("provider", "billing_period")
+    .option("maxRecordsPerFile", 1_000_000)
     .option("compression", "snappy").parquet(args["lake_path"]))
 
 job.commit()

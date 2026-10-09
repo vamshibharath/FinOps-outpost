@@ -1,8 +1,33 @@
+{{
+  config(
+    materialized = 'incremental',
+    incremental_strategy = 'delete+insert',
+    unique_key = ['provider', 'billing_period'],
+    cluster_by = ['billing_period', 'business_unit']
+  )
+}}
 -- The attribution fact: every dollar of source spend lands on exactly one business unit
 -- (or the explicit UNALLOCATED bucket). Invariant, enforced by tests/assert_allocation_reconciles:
 --   sum(allocated_effective_cost) == sum(stg effective_cost)  per provider and billing period.
-with charges as (
-    select * from {{ ref('int_charges_attributed') }}
+--
+-- Incremental by provider + billing period: a run only rebuilds months whose source data was
+-- (re)loaded since the last run, e.g. a restated AWS month. Closed, unchanged months are not
+-- touched. delete+insert replaces the whole month, so a restatement can never double count.
+-- cluster_by applies on Snowflake (prunes micro-partitions on period/owner filters).
+
+with changed_periods as (
+    select provider, billing_period
+    from {{ ref('int_charges_attributed') }}
+    group by all
+    {% if is_incremental() %}
+    having max(loaded_at) > (select coalesce(max(processed_at), cast('1900-01-01' as timestamp)) from {{ this }})
+    {% endif %}
+),
+
+charges as (
+    select c.*
+    from {{ ref('int_charges_attributed') }} c
+    join changed_periods using (provider, billing_period)
 ),
 
 direct as (
@@ -18,8 +43,8 @@ direct as (
 ),
 
 -- Untagged spend pooled per provider/period/category. Credits, tax, adjustments and
--- purchases get their own pool: they should follow each team's *spend*, not compute
--- hours (otherwise a big credit inflates the discount for whoever runs the most VMs).
+-- purchases get their own pool: they follow each team's *spend*, not compute hours
+-- (otherwise a big credit inflates the discount for whoever runs the most VMs).
 pools as (
     select provider, billing_period,
            case when charge_category = 'Usage' then service_category
@@ -32,14 +57,15 @@ pools as (
 
 w as (select * from {{ ref('int_allocation_weights') }}),
 
--- Decide which weight set each pool can actually use (rule first, then fallbacks).
+-- Which weight set each pool uses: its governed rule if that driver exists for this
+-- provider/month, else category spend share, else provider spend share, else UNALLOCATED.
 resolved as (
     select p.*,
         case
-            when coalesce(r.allocation_method, 'proportional_cost') = 'usage_driver'
-                 and exists (select 1 from w where w.weight_set = 'usage_driver'
-                             and w.provider = p.provider and w.billing_period = p.billing_period)
-                then 'usage_driver'
+            when exists (select 1 from w where w.weight_set = coalesce(r.allocation_method, 'category_cost')
+                         and w.provider = p.provider and w.billing_period = p.billing_period
+                         and (w.weight_set <> 'category_cost' or w.service_category = p.service_category))
+                then coalesce(r.allocation_method, 'category_cost')
             when exists (select 1 from w where w.weight_set = 'category_cost'
                          and w.provider = p.provider and w.billing_period = p.billing_period
                          and w.service_category = p.service_category)
@@ -57,7 +83,7 @@ shared as (
     select
         r.provider, r.billing_period, r.service_category,
         w.business_unit, 'shared' as application, 'shared' as environment,
-        'shared_' || r.weight_set as allocation_method,
+        'shared_' || r.weight_set   as allocation_method,
         r.pool_effective * w.weight as allocated_effective_cost,
         r.pool_billed * w.weight    as allocated_billed_cost,
         r.n                         as source_line_items
@@ -76,6 +102,9 @@ unallocated as (
     from resolved where weight_set = 'unallocated'
 )
 
-select * from direct
-union all select * from shared
-union all select * from unallocated
+select *, current_timestamp as processed_at
+from (
+    select * from direct
+    union all select * from shared
+    union all select * from unallocated
+)

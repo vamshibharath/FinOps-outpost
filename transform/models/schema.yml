@@ -16,6 +16,14 @@ models:
               arguments:
                 values: [Usage, Purchase, Tax, Credit, Adjustment]
 
+  - name: stg_telemetry__service_usage
+    description: Daily CPU core-hours and requests per application and provider (observability API).
+    columns:
+      - name: application
+        tests: [not_null]
+      - name: cpu_core_hours
+        tests: [not_null]
+
   - name: int_charge_tags
     description: Canonical business_unit / application / environment per charge, resolved via tag_key_aliases.
     columns:
@@ -33,7 +41,10 @@ models:
         tests:
           - accepted_values:
               arguments:
-                values: [direct, shared_usage_driver, shared_category_cost, shared_provider_cost, unallocated]
+                values: [direct, shared_telemetry_cpu, shared_telemetry_requests, shared_usage_driver, shared_category_cost, shared_provider_cost, unallocated]
+
+  - name: mart_data_completeness
+    description: Days with usage vs days in the period, per provider and month.
 
   - name: mart_chargeback_monthly
     description: Monthly chargeback per business unit and provider (direct vs shared).
